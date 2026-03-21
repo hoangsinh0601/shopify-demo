@@ -39,3 +39,11 @@ model ExportHistory {
   exportedAt    DateTime @default(now())
   totalProducts Int
 }
+
+model WebhookLog {
+  id         String   @id @default(uuid())
+  shop       String
+  topic      String
+  payload    String
+  receivedAt DateTime @default(now())
+}

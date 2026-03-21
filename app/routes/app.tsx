@@ -35,8 +35,10 @@ export default function App() {
     <PolarisAppProvider i18n={polarisTranslations}>
       <AppProvider embedded apiKey={apiKey}>
         <s-app-nav>
-          <s-link href="/app">Home</s-link>
-          <s-link href="/app/additional">Additional page</s-link>
+          <s-link href="/app">Dashboard</s-link>
+          <s-link href="/app/products">Sản phẩm</s-link>
+          <s-link href="/app/orders">Đơn hàng</s-link>
+          <s-link href="/app/inventory">Tồn kho</s-link>
         </s-app-nav>
         <Outlet />
       </AppProvider>

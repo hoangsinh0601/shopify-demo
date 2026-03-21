@@ -1,300 +1,115 @@
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
-import { useLoaderData, useFetcher } from "react-router";
+import { useLoaderData, useFetcher, Link } from "react-router";
 import { useEffect } from "react";
-import {
-  Page,
-  Layout,
-  Card,
-  IndexTable,
-  Text,
-  Badge,
-  Button,
-  BlockStack,
-  InlineStack,
-} from "@shopify/polaris";
+import { Page, BlockStack, InlineStack, Layout, Card, Text, Button } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import { useAppBridge } from "@shopify/app-bridge-react";
-import prisma from "../db.server";
-
-// --- Types ---
-
-interface ProductNode {
-  id: string;
-  title: string;
-  status: string;
-  vendor: string;
-  totalInventory: number;
-  tags: string[];
-}
-
-interface ProductsQueryResponse {
-  data: {
-    products: {
-      nodes: ProductNode[];
-      pageInfo: {
-        hasNextPage: boolean;
-        endCursor: string | null;
-      };
-    };
-  };
-}
-
-interface ActionResponse {
-  intent: "export" | "tagProduct";
-  success: boolean;
-  csv?: string;
-  error?: string;
-}
-
-// --- Shared GraphQL query ---
-
-const PRODUCTS_QUERY = `
-  #graphql
-  query GetProducts($first: Int!) {
-    products(first: $first, sortKey: CREATED_AT, reverse: true) {
-      pageInfo {
-        hasNextPage
-        endCursor
-      }
-      nodes {
-        id
-        title
-        status
-        vendor
-        totalInventory
-        tags
-      }
-    }
-  }
-`;
+import { fetchAllProducts } from "../services/product.server";
+import { createExportRecord, getExportHistory } from "../services/export.server";
+import { buildProductCsv } from "../utils/csv";
+import type { ExportActionResponse } from "../utils/graphql";
+import { StatsOverview } from "../components/organisms/StatsOverview";
+import { ExportHistory } from "../components/organisms/ExportHistory";
 
 // --- Loader ---
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { admin } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
 
-  const response = await admin.graphql(PRODUCTS_QUERY, {
-    variables: { first: 50 },
-  });
+  const products = await fetchAllProducts(admin, 250);
 
-  const { data } = (await response.json()) as ProductsQueryResponse;
+  const stats = {
+    total: products.length,
+    active: products.filter((p) => p.status === "ACTIVE").length,
+    draft: products.filter((p) => p.status === "DRAFT").length,
+    outOfStock: products.filter((p) => p.totalInventory <= 0).length,
+  };
 
-  return { products: data.products.nodes };
+  const exportHistory = await getExportHistory(session.shop);
+
+  return { stats, exportHistory };
 };
 
 // --- Action ---
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
-  const formData = await request.formData();
-  const intent = formData.get("intent") as string;
 
   try {
-    // --- Mutation: Gắn tag "Bán chạy" ---
-    if (intent === "tagProduct") {
-      const productId = formData.get("productId") as string;
-
-      const tagResponse = await admin.graphql(
-        `
-        #graphql
-        mutation addTags($id: ID!, $tags: [String!]!) {
-          tagsAdd(id: $id, tags: $tags) {
-            node { id }
-            userErrors { field message }
-          }
-        }
-      `,
-        {
-          variables: {
-            id: productId,
-            tags: ["Bán chạy"],
-          },
-        },
-      );
-
-      const tagResult = await tagResponse.json();
-      const userErrors =
-        (tagResult as { data: { tagsAdd: { userErrors: Array<{ field: string; message: string }> } } })
-          .data?.tagsAdd?.userErrors ?? [];
-
-      if (userErrors.length > 0) {
-        return {
-          intent: "tagProduct",
-          success: false,
-          error: userErrors.map((e) => e.message).join(", "),
-        } satisfies ActionResponse;
-      }
-
-      return {
-        intent: "tagProduct",
-        success: true,
-      } satisfies ActionResponse;
-    }
-
-    // --- Export CSV ---
-    const response = await admin.graphql(PRODUCTS_QUERY, {
-      variables: { first: 50 },
-    });
-
-    const { data } = (await response.json()) as ProductsQueryResponse;
-    const products = data.products.nodes;
-
-    await prisma.exportHistory.create({
-      data: {
-        shop: session.shop,
-        totalProducts: products.length,
-      },
-    });
-
-    const header = "ID,Title,Status,Vendor,Total Inventory\n";
-    const rows = products
-      .map((p) => {
-        const safeTitle = p.title?.replace(/"/g, '""') ?? "";
-        const safeVendor = p.vendor?.replace(/"/g, '""') ?? "";
-        return `"${p.id}","${safeTitle}","${p.status}","${safeVendor}",${p.totalInventory}`;
-      })
-      .join("\n");
-    const csvStr = "\uFEFF" + "sep=,\n" + header + rows;
-
-    return {
-      intent: "export",
-      success: true,
-      csv: csvStr,
-    } satisfies ActionResponse;
+    const products = await fetchAllProducts(admin, 250);
+    await createExportRecord(session.shop, products.length);
+    const csv = buildProductCsv(products);
+    return { success: true, csv } satisfies ExportActionResponse;
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Lỗi không xác định";
     return {
-      intent: intent === "tagProduct" ? "tagProduct" : "export",
       success: false,
-      error: message,
-    } satisfies ActionResponse;
+      error: error instanceof Error ? error.message : "Lỗi không xác định",
+    } satisfies ExportActionResponse;
   }
 };
 
-// --- Product Row Component ---
+// --- Dashboard ---
 
-function ProductRow({ product, index }: { product: ProductNode; index: number }) {
-  const fetcher = useFetcher<ActionResponse>();
-  const shopify = useAppBridge();
-  const isSubmitting = fetcher.state === "submitting";
-  const hasBestSellerTag = product.tags.includes("Bán chạy");
-
-  useEffect(() => {
-    if (fetcher.data?.intent === "tagProduct") {
-      if (fetcher.data.success) {
-        shopify.toast.show(`Đã gắn tag "Bán chạy" thành công!`);
-      } else {
-        shopify.toast.show(`Lỗi: ${fetcher.data.error}`, { isError: true });
-      }
-    }
-  }, [fetcher.data]);
-
-  return (
-    <IndexTable.Row id={product.id} key={product.id} position={index}>
-      <IndexTable.Cell>
-        <InlineStack gap="200" blockAlign="center">
-          <Text variant="bodyMd" fontWeight="bold" as="span">
-            {product.title}
-          </Text>
-          {hasBestSellerTag && <Badge tone="warning">Bán chạy</Badge>}
-        </InlineStack>
-      </IndexTable.Cell>
-      <IndexTable.Cell>
-        <Badge tone={product.status === "ACTIVE" ? "success" : "attention"}>
-          {product.status}
-        </Badge>
-      </IndexTable.Cell>
-      <IndexTable.Cell>{product.vendor}</IndexTable.Cell>
-      <IndexTable.Cell>{product.totalInventory}</IndexTable.Cell>
-      <IndexTable.Cell>
-        <Button
-          size="slim"
-          disabled={hasBestSellerTag}
-          loading={isSubmitting}
-          onClick={() =>
-            fetcher.submit(
-              { intent: "tagProduct", productId: product.id },
-              { method: "POST" },
-            )
-          }
-        >
-          {hasBestSellerTag ? "Đã gắn tag" : "Đánh dấu Bán chạy"}
-        </Button>
-      </IndexTable.Cell>
-    </IndexTable.Row>
-  );
-}
-
-// --- Main Page Component ---
-
-export default function CatalogManager() {
-  const { products } = useLoaderData<typeof loader>();
-  const exportFetcher = useFetcher<ActionResponse>();
+export default function Dashboard() {
+  const { stats, exportHistory } = useLoaderData<typeof loader>();
+  const exportFetcher = useFetcher<ExportActionResponse>();
   const shopify = useAppBridge();
 
   useEffect(() => {
     const data = exportFetcher.data;
-    if (data?.intent === "export") {
-      if (data.success && data.csv) {
-        shopify.toast.show("Xuất dữ liệu thành công");
-
-        const blob = new Blob([data.csv], { type: "text/csv;charset=utf-8;" });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.setAttribute("download", "catalog.csv");
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      } else if (!data.success && data.error) {
-        shopify.toast.show(`Lỗi xuất CSV: ${data.error}`, { isError: true });
-      }
+    if (data?.success && data.csv) {
+      shopify.toast.show("Xuất dữ liệu thành công");
+      const blob = new Blob([data.csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "catalog.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } else if (data && !data.success) {
+      shopify.toast.show(`Lỗi: ${data.error}`, { isError: true });
     }
   }, [exportFetcher.data]);
 
   return (
     <Page
-      title="Quản lý Catalog Sản Phẩm"
+      title="Dashboard"
       primaryAction={
         <Button
           variant="primary"
           loading={exportFetcher.state === "submitting"}
-          onClick={() =>
-            exportFetcher.submit({ intent: "export" }, { method: "POST" })
-          }
+          onClick={() => exportFetcher.submit({}, { method: "POST" })}
         >
-          Xuất dữ liệu Catalog
+          Xuất CSV tất cả sản phẩm
         </Button>
       }
     >
       <BlockStack gap="500">
+        <StatsOverview
+          total={stats.total}
+          active={stats.active}
+          draft={stats.draft}
+          outOfStock={stats.outOfStock}
+        />
+
         <Layout>
           <Layout.Section>
-            <Card padding="0">
-              <IndexTable
-                resourceName={{ singular: "sản phẩm", plural: "sản phẩm" }}
-                itemCount={products.length}
-                headings={[
-                  { title: "Tên sản phẩm" },
-                  { title: "Trạng thái" },
-                  { title: "Nhà cung cấp" },
-                  { title: "Tồn kho" },
-                  { title: "Hành động" },
-                ]}
-                selectable={false}
-              >
-                {products.map((product, index) => (
-                  <ProductRow
-                    key={product.id}
-                    product={product}
-                    index={index}
-                  />
-                ))}
-              </IndexTable>
+            <Card>
+              <BlockStack gap="300">
+                <Text as="h2" variant="headingMd">Truy cập nhanh</Text>
+                <InlineStack gap="300">
+                  <Link to="/app/products"><Button>Quản lý sản phẩm</Button></Link>
+                  <Link to="/app/orders"><Button>Xem đơn hàng</Button></Link>
+                  <Link to="/app/inventory"><Button>Kiểm tra tồn kho</Button></Link>
+                </InlineStack>
+              </BlockStack>
             </Card>
           </Layout.Section>
         </Layout>
+
+        <ExportHistory records={exportHistory} />
       </BlockStack>
     </Page>
   );
