@@ -32,3 +32,10 @@ model Session {
   refreshToken        String?
   refreshTokenExpires DateTime?
 }
+
+model ExportHistory {
+  id            String   @id @default(uuid())
+  shop          String
+  exportedAt    DateTime @default(now())
+  totalProducts Int
+}

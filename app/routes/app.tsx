@@ -1,9 +1,25 @@
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
+import type { DetailedHTMLProps, HTMLAttributes } from "react";
 import { Outlet, useLoaderData, useRouteError } from "react-router";
+
+import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
+import polarisTranslations from "@shopify/polaris/locales/en.json";
+import { AppProvider as PolarisAppProvider } from "@shopify/polaris";
+
+declare global {
+  namespace JSX {
+    interface IntrinsicElements {
+      "s-app-nav": DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
+      "s-link": DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement> & { href?: string };
+    }
+  }
+}
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
 
 import { authenticate } from "../shopify.server";
+
+export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
@@ -16,13 +32,15 @@ export default function App() {
   const { apiKey } = useLoaderData<typeof loader>();
 
   return (
-    <AppProvider embedded apiKey={apiKey}>
-      <s-app-nav>
-        <s-link href="/app">Home</s-link>
-        <s-link href="/app/additional">Additional page</s-link>
-      </s-app-nav>
-      <Outlet />
-    </AppProvider>
+    <PolarisAppProvider i18n={polarisTranslations}>
+      <AppProvider embedded apiKey={apiKey}>
+        <s-app-nav>
+          <s-link href="/app">Home</s-link>
+          <s-link href="/app/additional">Additional page</s-link>
+        </s-app-nav>
+        <Outlet />
+      </AppProvider>
+    </PolarisAppProvider>
   );
 }
 
@@ -31,6 +49,8 @@ export function ErrorBoundary() {
   return boundary.error(useRouteError());
 }
 
-export const headers: HeadersFunction = (headersArgs) => {
+import type { HeadersArgs } from "react-router";
+
+export const headers: HeadersFunction = (headersArgs: HeadersArgs) => {
   return boundary.headers(headersArgs);
 };
