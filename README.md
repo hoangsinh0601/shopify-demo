@@ -127,53 +127,165 @@ Route files only contain `loader`, `action`, and component composition. All busi
 
 ## Lessons Learned
 
-### 🔑 Shopify Embedded App — Navigation
-**Problem**: Polaris `Page` component `backAction={{ url: "..." }}` and `Button url="..."` cause **full page navigation**, breaking the embedded app session → login screen appears.
+### Shopify Admin GraphQL API
 
-**Solution**: Always use `onAction` + `useNavigate()` or `onClick` + `navigate()` for client-side routing:
+#### Cursor-based Pagination
+Shopify uses **cursor-based pagination** (not offset). Use `first`/`after` for forward and `last`/`before` for backward navigation. Always request `pageInfo { hasNextPage hasPreviousPage startCursor endCursor }`.
+
+#### Mutations Pattern
+All write operations follow the same structure: send a mutation with an `input` variable, then check `userErrors` array in the response. If `userErrors.length > 0`, the operation failed with validation errors — not an HTTP error.
 ```tsx
-// ❌ WRONG — full page navigation, loses session
-<Page backAction={{ url: "/app" }}>
-<Button url="/app/products/new">
-
-// ✅ CORRECT — client-side navigation
-<Page backAction={{ onAction: () => navigate("/app") }}>
-<Button onClick={() => navigate("/app/products/new")}>
+const { data } = await response.json();
+const userErrors = data.productCreate.userErrors; // Always check this!
 ```
 
-### 🔑 React Router Flat File Routing
-**Problem**: `app.products.tsx` acts as a **layout route**, swallowing child routes like `app.products.$id.tsx` → detail page doesn't render.
+#### GID Format
+Shopify IDs are globally unique: `gid://shopify/Product/123456`. Extract the numeric ID with `.split("/").pop()` when building URLs.
 
-**Solution**: Rename to `app.products._index.tsx` — the `_index` convention makes it an index route instead of a layout:
-```
-app.products.tsx          → Layout route (requires <Outlet />)
-app.products._index.tsx   → Index route (standalone)
-```
+#### API Scopes
+Each GraphQL field requires a specific access scope (e.g. `read_orders`, `read_locations`). Missing scope → runtime `Access denied` error. Declare all needed scopes in `shopify.app.toml`.
 
-### 🔑 Shopify API Scopes
-Each GraphQL field requires a specific scope. Missing scope → `Access denied` error.
+---
 
-Must be declared in `shopify.app.toml`:
-```toml
-[access_scopes]
-scopes = "read_products, write_products, read_orders, read_inventory, write_inventory, read_locations"
-```
+### React Router (Remix-based)
 
-### 🔑 Loader Authentication
-**Every route** in a Shopify embedded app must call `authenticate.admin(request)` in its loader. Missing it → Shopify has no session → login screen appears.
+#### Loader / Action Pattern
+- **Loader**: Runs on GET requests (page load). Fetches data, returns JSON. Accessed via `useLoaderData()`.
+- **Action**: Runs on POST/PUT/DELETE (form submissions). Mutates data, returns result. Triggered via `useFetcher().submit()`.
 
-### 🔑 i18n Architecture
-- Use React Context + custom hook (`useTranslation`) instead of heavy libraries
-- Detect locale from `Accept-Language` header in loader (server-side)
-- Polaris also needs locale switching via `AppProvider i18n`
-- Use dot-notation keys with parameter interpolation: `t("bulk.successMsg", { count: 5 })`
+This clean separation ensures data fetching and mutations never mix.
 
-### 🔑 Prisma Models
-When adding new models, always run migrations:
+#### Flat File Routing Conventions
+| File | Behavior |
+|------|----------|
+| `app.products.tsx` | **Layout route** — wraps children, must render `<Outlet />` |
+| `app.products._index.tsx` | **Index route** — standalone, renders at `/app/products` |
+| `app.products.$id.tsx` | **Dynamic route** — matches `/app/products/:id` |
+| `app.products.new.tsx` | **Static child** — matches `/app/products/new` |
+
+**Key pitfall**: If a listing page is named `app.products.tsx` without `<Outlet />`, it becomes a layout and "swallows" child routes. Rename to `_index.tsx` to make it standalone.
+
+#### useFetcher vs useSubmit
+- `useFetcher`: For mutations that **don't navigate** — returns `fetcher.data`, `fetcher.state`. Best for inline actions (tag, delete, adjust).
+- `useSubmit`: For mutations that **trigger navigation** — causes a full page reload of the current route.
+
+---
+
+### Shopify Embedded App
+
+#### Session & Authentication
+Every route **must** call `authenticate.admin(request)` in its loader. This validates the session token. Missing it → Shopify redirects to the login screen.
+
+#### Client-side Navigation
+Embedded apps run inside an iframe. Any **full page navigation** breaks out of the iframe and loses the session.
+
+| Method | Effect | Use? |
+|--------|--------|------|
+| `<a href>` | Full page navigation | ❌ Never |
+| `Button url="..."` | Full page navigation | ❌ Never |
+| `backAction={{ url }}` | Full page navigation | ❌ Never |
+| `navigate()` from `useNavigate` | Client-side routing | ✅ Always |
+| `<Link to>` from `react-router` | Client-side routing | ✅ Always |
+
+#### App Bridge
+`useAppBridge()` provides access to Shopify UI primitives inside the embedded iframe:
+- `shopify.toast.show(message)` — show success/error notifications
+- Used for feedback after mutations
+
+---
+
+### Polaris UI Library
+
+#### Core Components Used
+| Component | Purpose |
+|-----------|---------|
+| `Page` | Page layout with title, back action, primary/secondary actions |
+| `IndexTable` | Data table with rows, columns, selection |
+| `Card` | Content container |
+| `TextField` / `Select` | Form inputs |
+| `Badge` | Status indicators with tone (success, warning, critical) |
+| `Banner` | Alert messages |
+| `Modal` | Confirmation dialogs |
+| `Pagination` | Page navigation controls |
+
+#### Polaris i18n
+Polaris ships locale JSON files (`@shopify/polaris/locales/vi.json`). Pass the correct one to `<AppProvider i18n={...}>` to localize built-in component strings (e.g. pagination, empty states).
+
+---
+
+### Prisma ORM
+
+#### Schema → Migration → Client Flow
 ```bash
-npx prisma migrate dev --name add_model_name
+# 1. Define model in prisma/schema.prisma
+# 2. Generate migration
+npx prisma migrate dev --name add_new_model
+# 3. Regenerate client (auto-runs after migrate)
 npx prisma generate
 ```
+
+#### Server-only Access
+Prisma client is imported only in `.server.ts` files. Never import in client components — it would expose DB credentials.
+
+#### Type Inference
+Prisma auto-generates TypeScript types from the schema. `Date` fields come as `Date` objects from Prisma but must be serialized to `string` when passed to client components via loaders.
+
+---
+
+### Atomic Design Pattern
+
+#### Layer Responsibilities
+| Layer | Responsibility | Dependencies | Example |
+|-------|---------------|-------------|---------|
+| **Atoms** | Single UI element, no logic | Only Polaris | `StatusBadge`, `StatCard` |
+| **Molecules** | Combine atoms + simple interaction | Atoms + hooks | `ProductRow`, `SearchFilter` |
+| **Organisms** | Full feature blocks | Molecules + atoms | `ProductTable`, `MetafieldForm` |
+| **Routes** | Composition + data orchestration | Organisms + services | `app.products._index.tsx` |
+
+#### Benefits
+- **Reusability**: Same `SearchFilter` used across products, orders, inventory
+- **Testability**: Each layer can be tested in isolation
+- **Maintainability**: Changes to a badge style only touch one atom file
+
+---
+
+### Internationalization (i18n)
+
+#### Architecture
+Custom lightweight system using React Context — no external dependencies:
+1. **Locale detection**: `Accept-Language` header parsed in the layout loader (server-side)
+2. **TranslationProvider**: Wraps the entire app, provides `t()` function via context
+3. **`useTranslation()` hook**: Components call `t("key.path")` to get translated strings
+4. **Parameter interpolation**: `t("bulk.successMsg", { count: 5 })` replaces `{count}` in the template
+
+#### Locale Files Structure
+Dot-notation keys organized by page/feature:
+```json
+{
+  "nav": { "dashboard": "Dashboard", "products": "Products" },
+  "products": { "title": "Product Management", "searchPlaceholder": "..." },
+  "common": { "save": "Save", "cancel": "Cancel" }
+}
+```
+
+---
+
+### TypeScript Patterns
+
+#### `satisfies` Keyword
+Used on action return values to ensure the return type matches the expected interface at compile time while preserving the literal type:
+```tsx
+return { success: true, intent: "update" } satisfies ProductActionResponse;
+```
+
+#### Discriminated Unions for Actions
+When a route handles multiple action intents, use a union type with `intent` as discriminator:
+```tsx
+type ProductActionResponse = 
+  | { intent: "update"; success: boolean; error?: string }
+  | { intent: "delete"; success: boolean; error?: string };
+```
+
 
 ## Setup & Development
 
