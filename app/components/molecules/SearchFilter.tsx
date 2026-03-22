@@ -1,5 +1,5 @@
-import { useCallback } from "react";
 import { InlineStack, TextField, Select, Button } from "@shopify/polaris";
+import { useTranslation } from "../../utils/i18n";
 
 interface SearchFilterProps {
   searchValue: string;
@@ -17,18 +17,20 @@ export function SearchFilter({
   searchValue,
   onSearchChange,
   onClear,
-  searchPlaceholder = "Tìm kiếm...",
+  searchPlaceholder,
   filterLabel,
   filterOptions,
   filterValue,
   onFilterChange,
   onSubmit,
 }: SearchFilterProps) {
+  const { t } = useTranslation();
+
   return (
     <InlineStack gap="300" blockAlign="end">
       <div style={{ flex: 1 }}>
         <TextField
-          label="Tìm kiếm"
+          label={t("common.search")}
           value={searchValue}
           onChange={onSearchChange}
           placeholder={searchPlaceholder}
@@ -47,7 +49,7 @@ export function SearchFilter({
           />
         </div>
       )}
-      <Button onClick={onSubmit}>Tìm</Button>
+      <Button onClick={onSubmit}>{t("common.search")}</Button>
     </InlineStack>
   );
 }

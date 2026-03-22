@@ -1,6 +1,7 @@
 import { Layout, Card, IndexTable, Pagination } from "@shopify/polaris";
 import type { ProductNode, PageInfo } from "../../utils/graphql";
 import { ProductRow } from "../molecules/ProductRow";
+import { useTranslation } from "../../utils/i18n";
 
 interface ProductTableProps {
   products: ProductNode[];
@@ -10,19 +11,20 @@ interface ProductTableProps {
 }
 
 export function ProductTable({ products, pageInfo, onNextPage, onPrevPage }: ProductTableProps) {
+  const { t } = useTranslation();
+
   return (
     <Layout>
       <Layout.Section>
         <Card padding="0">
           <IndexTable
-            resourceName={{ singular: "sản phẩm", plural: "sản phẩm" }}
+            resourceName={{ singular: t("nav.products"), plural: t("nav.products") }}
             itemCount={products.length}
             headings={[
-              { title: "Tên sản phẩm" },
-              { title: "Trạng thái" },
-              { title: "Nhà cung cấp" },
-              { title: "Tồn kho" },
-              { title: "Hành động" },
+              { title: t("products.productName") },
+              { title: t("products.status") },
+              { title: t("products.vendor") },
+              { title: t("products.inventory") },
             ]}
             selectable={false}
           >

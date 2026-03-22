@@ -1,4 +1,5 @@
 import { Card, BlockStack, InlineStack, Text, TextField, Select, Button, FormLayout } from "@shopify/polaris";
+import { useTranslation } from "../../utils/i18n";
 
 interface ProductFormProps {
   title: string;
@@ -25,24 +26,26 @@ export function ProductForm({
   onSubmit,
   isSubmitting,
 }: ProductFormProps) {
+  const { t } = useTranslation();
+
   return (
     <Card>
       <BlockStack gap="400">
         <Text as="h2" variant="headingMd">
-          Thông tin sản phẩm
+          {t("productDetail.productInfo")}
         </Text>
         <FormLayout>
-          <TextField label="Tên sản phẩm" value={title} onChange={onTitleChange} autoComplete="off" />
+          <TextField label={t("productDetail.title")} value={title} onChange={onTitleChange} autoComplete="off" />
           <TextField
-            label="Mô tả (HTML)"
+            label={t("productDetail.description")}
             value={descriptionHtml}
             onChange={onDescriptionChange}
             multiline={4}
             autoComplete="off"
           />
-          <TextField label="Nhà cung cấp" value={vendor} onChange={onVendorChange} autoComplete="off" />
+          <TextField label={t("productDetail.vendor")} value={vendor} onChange={onVendorChange} autoComplete="off" />
           <Select
-            label="Trạng thái"
+            label={t("productDetail.status")}
             options={[
               { label: "Active", value: "ACTIVE" },
               { label: "Draft", value: "DRAFT" },
@@ -54,7 +57,7 @@ export function ProductForm({
         </FormLayout>
         <InlineStack align="end">
           <Button variant="primary" loading={isSubmitting} onClick={onSubmit}>
-            Lưu thay đổi
+            {t("productDetail.saveChanges")}
           </Button>
         </InlineStack>
       </BlockStack>

@@ -4,6 +4,7 @@ import { IndexTable, InlineStack, Text, Button } from "@shopify/polaris";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import type { InventoryLevelNode, ActionResponse } from "../../utils/graphql";
 import { StockBadge } from "../atoms/StockBadge";
+import { useTranslation } from "../../utils/i18n";
 
 interface InventoryRowProps {
   level: InventoryLevelNode;
@@ -14,6 +15,7 @@ interface InventoryRowProps {
 export function InventoryRow({ level, locationId, index }: InventoryRowProps) {
   const fetcher = useFetcher<ActionResponse>();
   const shopify = useAppBridge();
+  const { t } = useTranslation();
   const available = level.quantities.find((q) => q.name === "available")?.quantity ?? 0;
   const committed = level.quantities.find((q) => q.name === "committed")?.quantity ?? 0;
   const onHand = level.quantities.find((q) => q.name === "on_hand")?.quantity ?? 0;
@@ -21,9 +23,9 @@ export function InventoryRow({ level, locationId, index }: InventoryRowProps) {
 
   useEffect(() => {
     if (fetcher.data?.success) {
-      shopify.toast.show("Đã điều chỉnh tồn kho!");
+      shopify.toast.show(t("inventory.adjustSuccess"));
     } else if (fetcher.data && !fetcher.data.success) {
-      shopify.toast.show(`Lỗi: ${fetcher.data.error}`, { isError: true });
+      shopify.toast.show(`${t("common.error")}: ${fetcher.data.error}`, { isError: true });
     }
   }, [fetcher.data]);
 

@@ -10,12 +10,10 @@ import { buildProductCsv } from "../utils/csv";
 import type { ExportActionResponse } from "../utils/graphql";
 import { StatsOverview } from "../components/organisms/StatsOverview";
 import { ExportHistory } from "../components/organisms/ExportHistory";
-
-// --- Loader ---
+import { useTranslation } from "../utils/i18n";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
-
   const products = await fetchAllProducts(admin, 250);
 
   const stats = {
@@ -26,15 +24,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   };
 
   const exportHistory = await getExportHistory(session.shop);
-
   return { stats, exportHistory };
 };
 
-// --- Action ---
-
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
-
   try {
     const products = await fetchAllProducts(admin, 250);
     await createExportRecord(session.shop, products.length);
@@ -43,22 +37,21 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Lỗi không xác định",
+      error: error instanceof Error ? error.message : "Unknown error",
     } satisfies ExportActionResponse;
   }
 };
-
-// --- Dashboard ---
 
 export default function Dashboard() {
   const { stats, exportHistory } = useLoaderData<typeof loader>();
   const exportFetcher = useFetcher<ExportActionResponse>();
   const shopify = useAppBridge();
+  const { t } = useTranslation();
 
   useEffect(() => {
     const data = exportFetcher.data;
     if (data?.success && data.csv) {
-      shopify.toast.show("Xuất dữ liệu thành công");
+      shopify.toast.show(t("dashboard.exportSuccess"));
       const blob = new Blob([data.csv], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -69,40 +62,35 @@ export default function Dashboard() {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
     } else if (data && !data.success) {
-      shopify.toast.show(`Lỗi: ${data.error}`, { isError: true });
+      shopify.toast.show(`${t("common.error")}: ${data.error}`, { isError: true });
     }
   }, [exportFetcher.data]);
 
   return (
     <Page
-      title="Dashboard"
+      title={t("dashboard.title")}
       primaryAction={
         <Button
           variant="primary"
           loading={exportFetcher.state === "submitting"}
           onClick={() => exportFetcher.submit({}, { method: "POST" })}
         >
-          Xuất CSV tất cả sản phẩm
+          {t("dashboard.exportCsv")}
         </Button>
       }
     >
       <BlockStack gap="500">
-        <StatsOverview
-          total={stats.total}
-          active={stats.active}
-          draft={stats.draft}
-          outOfStock={stats.outOfStock}
-        />
+        <StatsOverview total={stats.total} active={stats.active} draft={stats.draft} outOfStock={stats.outOfStock} />
 
         <Layout>
           <Layout.Section>
             <Card>
               <BlockStack gap="300">
-                <Text as="h2" variant="headingMd">Truy cập nhanh</Text>
+                <Text as="h2" variant="headingMd">{t("dashboard.quickAccess")}</Text>
                 <InlineStack gap="300">
-                  <Link to="/app/products"><Button>Quản lý sản phẩm</Button></Link>
-                  <Link to="/app/orders"><Button>Xem đơn hàng</Button></Link>
-                  <Link to="/app/inventory"><Button>Kiểm tra tồn kho</Button></Link>
+                  <Link to="/app/products"><Button>{t("dashboard.manageProducts")}</Button></Link>
+                  <Link to="/app/orders"><Button>{t("dashboard.viewOrders")}</Button></Link>
+                  <Link to="/app/inventory"><Button>{t("dashboard.checkInventory")}</Button></Link>
                 </InlineStack>
               </BlockStack>
             </Card>

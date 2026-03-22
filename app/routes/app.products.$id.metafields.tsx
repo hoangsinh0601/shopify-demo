@@ -8,8 +8,7 @@ import { fetchMetafields, setMetafield, deleteMetafield } from "../services/meta
 import type { MetafieldActionResponse, MetafieldNode } from "../utils/graphql";
 import { MetafieldRow } from "../components/molecules/MetafieldRow";
 import { MetafieldForm } from "../components/organisms/MetafieldForm";
-
-// --- Loader ---
+import { useTranslation } from "../utils/i18n";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { admin } = await authenticate.admin(request);
@@ -17,8 +16,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const result = await fetchMetafields(admin, productId);
   return { ...result, numericId: params.id };
 };
-
-// --- Action ---
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
   const { admin } = await authenticate.admin(request);
@@ -48,17 +45,16 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     return {
       intent: (intent === "delete" ? "delete" : "set") as "set" | "delete",
       success: false,
-      error: error instanceof Error ? error.message : "Lỗi không xác định",
+      error: error instanceof Error ? error.message : "Unknown error",
     } satisfies MetafieldActionResponse;
   }
 };
-
-// --- Metafields Page ---
 
 export default function ProductMetafieldsPage() {
   const { productTitle, metafields, numericId } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<MetafieldActionResponse>();
   const shopify = useAppBridge();
+  const { t } = useTranslation();
 
   const [showForm, setShowForm] = useState(false);
   const [namespace, setNamespace] = useState("custom");
@@ -68,12 +64,14 @@ export default function ProductMetafieldsPage() {
 
   useEffect(() => {
     if (fetcher.data?.success) {
-      shopify.toast.show(fetcher.data.intent === "delete" ? "Đã xóa metafield!" : "Đã lưu metafield!");
+      shopify.toast.show(
+        fetcher.data.intent === "delete" ? t("metafields.deleteSuccess") : t("metafields.saveSuccess"),
+      );
       setShowForm(false);
       setKey("");
       setValue("");
     } else if (fetcher.data && !fetcher.data.success) {
-      shopify.toast.show(`Lỗi: ${fetcher.data.error}`, { isError: true });
+      shopify.toast.show(`${t("common.error")}: ${fetcher.data.error}`, { isError: true });
     }
   }, [fetcher.data]);
 
@@ -91,11 +89,11 @@ export default function ProductMetafieldsPage() {
 
   return (
     <Page
-      title={`Metafields — ${productTitle}`}
+      title={`${t("metafields.title")} — ${productTitle}`}
       backAction={{ url: `/app/products/${numericId}` }}
       primaryAction={
         <Button variant="primary" onClick={() => setShowForm(true)}>
-          Thêm Metafield
+          {t("metafields.addMetafield")}
         </Button>
       }
     >
@@ -125,11 +123,11 @@ export default function ProductMetafieldsPage() {
                 resourceName={{ singular: "metafield", plural: "metafields" }}
                 itemCount={metafields.length}
                 headings={[
-                  { title: "Namespace" },
-                  { title: "Key" },
-                  { title: "Type" },
-                  { title: "Value" },
-                  { title: "Hành động" },
+                  { title: t("metafields.namespace") },
+                  { title: t("metafields.key") },
+                  { title: t("metafields.dataType") },
+                  { title: t("metafields.value") },
+                  { title: t("metafields.actions") },
                 ]}
                 selectable={false}
               >

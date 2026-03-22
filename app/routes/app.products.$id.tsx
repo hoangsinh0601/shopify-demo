@@ -8,8 +8,7 @@ import { fetchProductDetail, updateProduct } from "../services/product.server";
 import type { ActionResponse } from "../utils/graphql";
 import { extractNumericId } from "../utils/graphql";
 import { ProductForm } from "../components/organisms/ProductForm";
-
-// --- Loader ---
+import { useTranslation } from "../utils/i18n";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { admin } = await authenticate.admin(request);
@@ -17,8 +16,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const product = await fetchProductDetail(admin, productId);
   return { product };
 };
-
-// --- Action ---
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
   const { admin } = await authenticate.admin(request);
@@ -37,17 +34,16 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Lỗi không xác định",
+      error: error instanceof Error ? error.message : "Unknown error",
     } satisfies ActionResponse;
   }
 };
-
-// --- Product Detail Page ---
 
 export default function ProductDetailPage() {
   const { product } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<ActionResponse>();
   const shopify = useAppBridge();
+  const { t } = useTranslation();
 
   const [title, setTitle] = useState(product.title);
   const [descriptionHtml, setDescriptionHtml] = useState(product.descriptionHtml ?? "");
@@ -56,9 +52,9 @@ export default function ProductDetailPage() {
 
   useEffect(() => {
     if (fetcher.data?.success) {
-      shopify.toast.show("Cập nhật sản phẩm thành công!");
+      shopify.toast.show(t("productDetail.updateSuccess"));
     } else if (fetcher.data && !fetcher.data.success) {
-      shopify.toast.show(`Lỗi: ${fetcher.data.error}`, { isError: true });
+      shopify.toast.show(`${t("common.error")}: ${fetcher.data.error}`, { isError: true });
     }
   }, [fetcher.data]);
 
@@ -68,7 +64,7 @@ export default function ProductDetailPage() {
     <Page
       title={product.title}
       backAction={{ url: "/app/products" }}
-      secondaryActions={[{ content: "Metafields", url: `/app/products/${numericId}/metafields` }]}
+      secondaryActions={[{ content: t("productDetail.metafields"), url: `/app/products/${numericId}/metafields` }]}
     >
       <BlockStack gap="500">
         <Layout>
@@ -82,9 +78,7 @@ export default function ProductDetailPage() {
               onVendorChange={setVendor}
               status={status}
               onStatusChange={setStatus}
-              onSubmit={() =>
-                fetcher.submit({ title, descriptionHtml, vendor, status }, { method: "POST" })
-              }
+              onSubmit={() => fetcher.submit({ title, descriptionHtml, vendor, status }, { method: "POST" })}
               isSubmitting={fetcher.state === "submitting"}
             />
           </Layout.Section>
@@ -92,16 +86,14 @@ export default function ProductDetailPage() {
           <Layout.Section variant="oneThird">
             <Card>
               <BlockStack gap="300">
-                <Text as="h2" variant="headingMd">Thông tin thêm</Text>
+                <Text as="h2" variant="headingMd">{t("productDetail.additionalInfo")}</Text>
                 <Text as="p" variant="bodySm" tone="subdued">
-                  Loại: {product.productType || "N/A"}
+                  {t("productDetail.type")}: {product.productType || "N/A"}
                 </Text>
                 <InlineStack gap="200" wrap>
-                  {product.tags.map((tag) => (
-                    <Badge key={tag}>{tag}</Badge>
-                  ))}
+                  {product.tags.map((tag) => (<Badge key={tag}>{tag}</Badge>))}
                   {product.tags.length === 0 && (
-                    <Text as="p" variant="bodySm" tone="subdued">Không có tag</Text>
+                    <Text as="p" variant="bodySm" tone="subdued">{t("productDetail.noTags")}</Text>
                   )}
                 </InlineStack>
               </BlockStack>
@@ -109,23 +101,22 @@ export default function ProductDetailPage() {
           </Layout.Section>
         </Layout>
 
-        {/* Variants Table */}
         <Layout>
           <Layout.Section>
             <Card padding="0">
               <div style={{ padding: "16px 16px 0" }}>
                 <Text as="h2" variant="headingMd">
-                  Variants ({product.variants.nodes.length})
+                  {t("productDetail.variants")} ({product.variants.nodes.length})
                 </Text>
               </div>
               <IndexTable
                 resourceName={{ singular: "variant", plural: "variants" }}
                 itemCount={product.variants.nodes.length}
                 headings={[
-                  { title: "Tên variant" },
-                  { title: "SKU" },
-                  { title: "Giá" },
-                  { title: "Tồn kho" },
+                  { title: t("productDetail.variantName") },
+                  { title: t("productDetail.sku") },
+                  { title: t("productDetail.price") },
+                  { title: t("products.inventory") },
                 ]}
                 selectable={false}
               >

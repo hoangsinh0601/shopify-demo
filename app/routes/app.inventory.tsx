@@ -5,8 +5,7 @@ import { authenticate } from "../shopify.server";
 import { fetchInventoryByLocation, adjustInventory } from "../services/inventory.server";
 import type { ActionResponse } from "../utils/graphql";
 import { InventoryTable } from "../components/organisms/InventoryTable";
-
-// --- Loader ---
+import { useTranslation } from "../utils/i18n";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin } = await authenticate.admin(request);
@@ -14,15 +13,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return { locations };
 };
 
-// --- Action ---
-
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { admin } = await authenticate.admin(request);
   const formData = await request.formData();
 
   const delta = parseInt(formData.get("delta") as string, 10);
   if (isNaN(delta)) {
-    return { success: false, error: "Số lượng điều chỉnh không hợp lệ" } satisfies ActionResponse;
+    return { success: false, error: "Invalid adjustment" } satisfies ActionResponse;
   }
 
   try {
@@ -35,15 +32,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Lỗi không xác định",
+      error: error instanceof Error ? error.message : "Unknown error",
     } satisfies ActionResponse;
   }
 };
 
-// --- Inventory Page ---
-
 export default function InventoryPage() {
   const { locations } = useLoaderData<typeof loader>();
+  const { t } = useTranslation();
 
   const lowStockCount = locations.reduce(
     (count, loc) =>
@@ -66,18 +62,18 @@ export default function InventoryPage() {
   );
 
   return (
-    <Page title="Quản lý Tồn kho" backAction={{ url: "/app" }}>
+    <Page title={t("inventory.title")} backAction={{ url: "/app" }}>
       <BlockStack gap="500">
         {(lowStockCount > 0 || outOfStockCount > 0) && (
           <BlockStack gap="300">
             {outOfStockCount > 0 && (
-              <Banner title="Cảnh báo hết hàng" tone="critical">
-                <p>{outOfStockCount} sản phẩm đã hết hàng.</p>
+              <Banner title={t("inventory.outOfStockAlert")} tone="critical">
+                <p>{t("inventory.outOfStockMsg", { count: outOfStockCount })}</p>
               </Banner>
             )}
             {lowStockCount > 0 && (
-              <Banner title="Tồn kho thấp" tone="warning">
-                <p>{lowStockCount} sản phẩm có tồn kho dưới 5 đơn vị.</p>
+              <Banner title={t("inventory.lowStockAlert")} tone="warning">
+                <p>{t("inventory.lowStockMsg", { count: lowStockCount })}</p>
               </Banner>
             )}
           </BlockStack>

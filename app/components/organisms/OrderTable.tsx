@@ -1,6 +1,7 @@
 import { Layout, Card, IndexTable, Pagination } from "@shopify/polaris";
 import type { OrderNode, PageInfo } from "../../utils/graphql";
 import { OrderRow } from "../molecules/OrderRow";
+import { useTranslation } from "../../utils/i18n";
 
 interface OrderTableProps {
   orders: OrderNode[];
@@ -10,20 +11,22 @@ interface OrderTableProps {
 }
 
 export function OrderTable({ orders, pageInfo, onNextPage, onPrevPage }: OrderTableProps) {
+  const { t } = useTranslation();
+
   return (
     <Layout>
       <Layout.Section>
         <Card padding="0">
           <IndexTable
-            resourceName={{ singular: "đơn hàng", plural: "đơn hàng" }}
+            resourceName={{ singular: t("nav.orders"), plural: t("nav.orders") }}
             itemCount={orders.length}
             headings={[
-              { title: "Mã đơn" },
-              { title: "Khách hàng" },
-              { title: "Thanh toán" },
-              { title: "Giao hàng" },
-              { title: "Tổng tiền" },
-              { title: "Ngày tạo" },
+              { title: t("orders.orderName") },
+              { title: t("orders.customer") },
+              { title: t("orders.financial") },
+              { title: t("orders.fulfillment") },
+              { title: t("orders.totalPrice") },
+              { title: t("orders.createdAt") },
             ]}
             selectable={false}
           >

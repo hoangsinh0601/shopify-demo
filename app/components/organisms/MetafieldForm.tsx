@@ -1,5 +1,5 @@
 import { Card, BlockStack, InlineStack, Text, TextField, Select, Button, FormLayout } from "@shopify/polaris";
-import { METAFIELD_TYPES } from "../../utils/graphql";
+import { useTranslation } from "../../utils/i18n";
 
 interface MetafieldFormProps {
   namespace: string;
@@ -28,25 +28,34 @@ export function MetafieldForm({
   onCancel,
   isSubmitting,
 }: MetafieldFormProps) {
+  const { t } = useTranslation();
+
+  const typeOptions = [
+    { label: t("metafields.types.singleLine"), value: "single_line_text_field" },
+    { label: t("metafields.types.multiLine"), value: "multi_line_text_field" },
+    { label: t("metafields.types.integer"), value: "number_integer" },
+    { label: t("metafields.types.decimal"), value: "number_decimal" },
+    { label: t("metafields.types.boolean"), value: "boolean" },
+    { label: t("metafields.types.date"), value: "date" },
+    { label: t("metafields.types.url"), value: "url" },
+    { label: t("metafields.types.color"), value: "color" },
+    { label: t("metafields.types.json"), value: "json" },
+  ];
+
   return (
     <Card>
       <BlockStack gap="400">
         <Text as="h2" variant="headingMd">
-          Thêm / Sửa Metafield
+          {t("metafields.editMetafield")}
         </Text>
         <FormLayout>
           <FormLayout.Group>
-            <TextField label="Namespace" value={namespace} onChange={onNamespaceChange} autoComplete="off" />
-            <TextField label="Key" value={keyValue} onChange={onKeyChange} autoComplete="off" />
+            <TextField label={t("metafields.namespace")} value={namespace} onChange={onNamespaceChange} autoComplete="off" />
+            <TextField label={t("metafields.key")} value={keyValue} onChange={onKeyChange} autoComplete="off" />
           </FormLayout.Group>
-          <Select
-            label="Loại dữ liệu"
-            options={[...METAFIELD_TYPES]}
-            value={type}
-            onChange={onTypeChange}
-          />
+          <Select label={t("metafields.dataType")} options={typeOptions} value={type} onChange={onTypeChange} />
           <TextField
-            label="Giá trị"
+            label={t("metafields.value")}
             value={value}
             onChange={onValueChange}
             multiline={type === "multi_line_text_field" || type === "json" ? 4 : undefined}
@@ -54,9 +63,9 @@ export function MetafieldForm({
           />
         </FormLayout>
         <InlineStack gap="300" align="end">
-          <Button onClick={onCancel}>Hủy</Button>
+          <Button onClick={onCancel}>{t("common.cancel")}</Button>
           <Button variant="primary" loading={isSubmitting} onClick={onSubmit}>
-            Lưu Metafield
+            {t("metafields.saveMetafield")}
           </Button>
         </InlineStack>
       </BlockStack>

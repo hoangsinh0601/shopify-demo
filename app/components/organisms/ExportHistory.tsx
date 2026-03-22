@@ -1,5 +1,6 @@
 import { Layout, Card, IndexTable, Text, Badge, Box } from "@shopify/polaris";
 import { formatDateTime } from "../../utils/format";
+import { useTranslation } from "../../utils/i18n";
 
 interface ExportRecord {
   id: string;
@@ -12,19 +13,24 @@ interface ExportHistoryProps {
 }
 
 export function ExportHistory({ records }: ExportHistoryProps) {
+  const { t } = useTranslation();
+
   return (
     <Layout>
       <Layout.Section>
         <Card padding="0">
           <Box padding="400" paddingBlockEnd="0">
             <Text as="h2" variant="headingMd">
-              Lịch sử xuất dữ liệu
+              {t("dashboard.exportHistory")}
             </Text>
           </Box>
           <IndexTable
-            resourceName={{ singular: "lần xuất", plural: "lần xuất" }}
+            resourceName={{ singular: "export", plural: "exports" }}
             itemCount={records.length}
-            headings={[{ title: "Thời gian" }, { title: "Số sản phẩm" }]}
+            headings={[
+              { title: t("dashboard.exportTime") },
+              { title: t("dashboard.exportCount") },
+            ]}
             selectable={false}
           >
             {records.map((record, index) => (

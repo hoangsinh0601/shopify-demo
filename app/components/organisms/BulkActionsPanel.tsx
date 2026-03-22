@@ -1,4 +1,5 @@
 import { Card, BlockStack, InlineStack, Text, TextField, Select, Button, Banner } from "@shopify/polaris";
+import { useTranslation } from "../../utils/i18n";
 
 interface BulkActionsPanelProps {
   selectedCount: number;
@@ -23,18 +24,19 @@ export function BulkActionsPanel({
   onBulkStatusUpdate,
   isSubmitting,
 }: BulkActionsPanelProps) {
+  const { t } = useTranslation();
   const hasSelection = selectedCount > 0;
 
   return (
     <Card>
       <BlockStack gap="400">
         <Text as="h2" variant="headingMd">
-          Thao tác ({selectedCount} sản phẩm đã chọn)
+          {t("bulk.operations", { count: selectedCount })}
         </Text>
 
         {!hasSelection && (
           <Banner tone="info">
-            <p>Chọn sản phẩm từ bảng bên dưới để thực hiện thao tác hàng loạt.</p>
+            <p>{t("bulk.selectPrompt")}</p>
           </Banner>
         )}
 
@@ -42,20 +44,20 @@ export function BulkActionsPanel({
           <BlockStack gap="300">
             <InlineStack gap="300" blockAlign="end">
               <div style={{ width: 200 }}>
-                <TextField label="Tag" value={tagInput} onChange={onTagInputChange} autoComplete="off" />
+                <TextField label={t("bulk.tag")} value={tagInput} onChange={onTagInputChange} autoComplete="off" />
               </div>
               <Button loading={isSubmitting} onClick={onBulkTag}>
-                Gắn tag
+                {t("bulk.addTag")}
               </Button>
               <Button tone="critical" loading={isSubmitting} onClick={onBulkRemoveTag}>
-                Gỡ tag
+                {t("bulk.removeTag")}
               </Button>
             </InlineStack>
 
             <InlineStack gap="300" blockAlign="end">
               <div style={{ width: 200 }}>
                 <Select
-                  label="Trạng thái mới"
+                  label={t("bulk.newStatus")}
                   options={[
                     { label: "Active", value: "ACTIVE" },
                     { label: "Draft", value: "DRAFT" },
@@ -66,7 +68,7 @@ export function BulkActionsPanel({
                 />
               </div>
               <Button variant="primary" loading={isSubmitting} onClick={onBulkStatusUpdate}>
-                Đổi trạng thái
+                {t("bulk.changeStatus")}
               </Button>
             </InlineStack>
           </BlockStack>

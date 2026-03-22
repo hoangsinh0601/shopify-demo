@@ -6,8 +6,7 @@ import { authenticate } from "../shopify.server";
 import { fetchOrders } from "../services/order.server";
 import { SearchFilter } from "../components/molecules/SearchFilter";
 import { OrderTable } from "../components/organisms/OrderTable";
-
-// --- Loader ---
+import { useTranslation } from "../utils/i18n";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin } = await authenticate.admin(request);
@@ -27,12 +26,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   };
 };
 
-// --- Orders Page ---
-
 export default function OrdersPage() {
   const { orders, pageInfo, search, financialStatus } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { t } = useTranslation();
   const [searchValue, setSearchValue] = useState(search);
   const [financial, setFinancial] = useState(financialStatus);
 
@@ -58,7 +56,7 @@ export default function OrdersPage() {
   };
 
   return (
-    <Page title="Quản lý Đơn hàng" backAction={{ url: "/app" }}>
+    <Page title={t("orders.title")} backAction={{ url: "/app" }}>
       <BlockStack gap="500">
         <Card>
           <SearchFilter
@@ -70,13 +68,13 @@ export default function OrdersPage() {
               if (financial) params.set("financial", financial);
               navigate(`/app/orders?${params.toString()}`);
             }}
-            searchPlaceholder="Mã đơn hoặc email..."
-            filterLabel="Thanh toán"
+            searchPlaceholder={t("orders.searchPlaceholder")}
+            filterLabel={t("orders.filterFinancial")}
             filterOptions={[
-              { label: "Tất cả", value: "" },
-              { label: "Đã thanh toán", value: "paid" },
-              { label: "Chờ thanh toán", value: "pending" },
-              { label: "Đã hoàn tiền", value: "refunded" },
+              { label: t("common.all"), value: "" },
+              { label: t("orders.paid"), value: "paid" },
+              { label: t("orders.pending"), value: "pending" },
+              { label: t("orders.refunded"), value: "refunded" },
             ]}
             filterValue={financial}
             onFilterChange={(val) => {
@@ -90,12 +88,7 @@ export default function OrdersPage() {
           />
         </Card>
 
-        <OrderTable
-          orders={orders}
-          pageInfo={pageInfo}
-          onNextPage={handleNextPage}
-          onPrevPage={handlePrevPage}
-        />
+        <OrderTable orders={orders} pageInfo={pageInfo} onNextPage={handleNextPage} onPrevPage={handlePrevPage} />
       </BlockStack>
     </Page>
   );

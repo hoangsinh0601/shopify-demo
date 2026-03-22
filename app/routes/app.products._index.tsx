@@ -2,20 +2,8 @@ import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 import { useLoaderData, useNavigate, useFetcher, useSearchParams } from "react-router";
 import { useState, useEffect, useCallback } from "react";
 import {
-  Page,
-  BlockStack,
-  Card,
-  Layout,
-  IndexTable,
-  Checkbox,
-  Text,
-  InlineStack,
-  Badge,
-  Button,
-  Pagination,
-  TextField,
-  Select,
-  Banner,
+  Page, BlockStack, Card, Layout, IndexTable, Checkbox, Text,
+  InlineStack, Badge, Button, Pagination,
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import { useAppBridge } from "@shopify/app-bridge-react";
@@ -26,7 +14,7 @@ import { extractNumericId } from "../utils/graphql";
 import { StatusBadge } from "../components/atoms/StatusBadge";
 import { SearchFilter } from "../components/molecules/SearchFilter";
 import { BulkActionsPanel } from "../components/organisms/BulkActionsPanel";
-
+import { useTranslation } from "../utils/i18n";
 
 // --- Loader ---
 
@@ -56,7 +44,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const intent = formData.get("intent") as string;
 
   try {
-    // Bulk tag
     if (intent === "bulkTag" || intent === "bulkRemoveTag") {
       const productIds = JSON.parse(formData.get("productIds") as string) as string[];
       const tag = formData.get("tag") as string;
@@ -65,7 +52,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       return { intent, success: true, processed } satisfies BulkActionResponse;
     }
 
-    // Bulk status
     if (intent === "bulkStatus") {
       const productIds = JSON.parse(formData.get("productIds") as string) as string[];
       const status = formData.get("status") as string;
@@ -78,25 +64,20 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return {
       intent: "bulkTag" as const,
       success: false,
-      error: error instanceof Error ? error.message : "Lỗi không xác định",
+      error: error instanceof Error ? error.message : "Unknown error",
     } satisfies BulkActionResponse;
   }
 };
 
-// --- Product Row with Checkbox ---
+// --- Product Row ---
 
 function ProductRow({
-  product,
-  index,
-  isSelected,
-  onToggle,
+  product, index, isSelected, onToggle,
 }: {
-  product: ProductNode;
-  index: number;
-  isSelected: boolean;
-  onToggle: (id: string) => void;
+  product: ProductNode; index: number; isSelected: boolean; onToggle: (id: string) => void;
 }) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const hasBestSellerTag = product.tags.includes("Bán chạy");
   const numericId = extractNumericId(product.id);
 
@@ -110,12 +91,10 @@ function ProductRow({
           <Button variant="plain" onClick={() => navigate(`/app/products/${numericId}`)}>
             {product.title}
           </Button>
-          {hasBestSellerTag && <Badge tone="warning">Bán chạy</Badge>}
+          {hasBestSellerTag && <Badge tone="warning">{t("products.bestSeller")}</Badge>}
         </InlineStack>
       </IndexTable.Cell>
-      <IndexTable.Cell>
-        <StatusBadge status={product.status} />
-      </IndexTable.Cell>
+      <IndexTable.Cell><StatusBadge status={product.status} /></IndexTable.Cell>
       <IndexTable.Cell>{product.vendor}</IndexTable.Cell>
       <IndexTable.Cell>
         <Text as="span" tone={product.totalInventory <= 0 ? "critical" : undefined}>
@@ -134,6 +113,7 @@ export default function ProductsPage() {
   const [searchParams] = useSearchParams();
   const bulkFetcher = useFetcher<BulkActionResponse>();
   const shopify = useAppBridge();
+  const { t } = useTranslation();
 
   const [searchValue, setSearchValue] = useState(search);
   const [statusValue, setStatusValue] = useState(status);
@@ -141,23 +121,21 @@ export default function ProductsPage() {
   const [tagInput, setTagInput] = useState("Bán chạy");
   const [bulkStatus, setBulkStatus] = useState("ACTIVE");
 
-  // Bulk action toast
   useEffect(() => {
     if (bulkFetcher.data?.success) {
       shopify.toast.show(
-        `Thao tác thành công! Đã xử lý ${bulkFetcher.data.processed}/${selectedIds.size} sản phẩm.`,
+        t("bulk.successMsg", { processed: bulkFetcher.data.processed ?? 0, total: selectedIds.size }),
       );
       setSelectedIds(new Set());
     } else if (bulkFetcher.data && !bulkFetcher.data.success) {
-      shopify.toast.show(`Lỗi: ${bulkFetcher.data.error}`, { isError: true });
+      shopify.toast.show(`${t("common.error")}: ${bulkFetcher.data.error}`, { isError: true });
     }
   }, [bulkFetcher.data]);
 
   const toggleSelection = useCallback((id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
   }, []);
@@ -195,12 +173,9 @@ export default function ProductsPage() {
     navigate(`/app/products?${params.toString()}`);
   };
 
-  const isBulkSubmitting = bulkFetcher.state === "submitting";
-
   return (
-    <Page title="Quản lý Sản phẩm" backAction={{ url: "/app" }}>
+    <Page title={t("products.title")} backAction={{ url: "/app" }}>
       <BlockStack gap="500">
-        {/* Search & Filter */}
         <Card>
           <SearchFilter
             searchValue={searchValue}
@@ -211,13 +186,13 @@ export default function ProductsPage() {
               if (statusValue) params.set("status", statusValue);
               navigate(`/app/products?${params.toString()}`);
             }}
-            searchPlaceholder="Nhập tên sản phẩm..."
-            filterLabel="Trạng thái"
+            searchPlaceholder={t("products.searchPlaceholder")}
+            filterLabel={t("products.status")}
             filterOptions={[
-              { label: "Tất cả", value: "" },
-              { label: "Active", value: "active" },
-              { label: "Draft", value: "draft" },
-              { label: "Archived", value: "archived" },
+              { label: t("common.all"), value: "" },
+              { label: t("products.statusActive"), value: "active" },
+              { label: t("products.statusDraft"), value: "draft" },
+              { label: t("products.statusArchived"), value: "archived" },
             ]}
             filterValue={statusValue}
             onFilterChange={(val) => {
@@ -231,7 +206,6 @@ export default function ProductsPage() {
           />
         </Card>
 
-        {/* Bulk Actions Panel — visible when items selected */}
         {selectedIds.size > 0 && (
           <BulkActionsPanel
             selectedCount={selectedIds.size}
@@ -242,27 +216,25 @@ export default function ProductsPage() {
             onBulkTag={() => submitBulk("bulkTag", { tag: tagInput })}
             onBulkRemoveTag={() => submitBulk("bulkRemoveTag", { tag: tagInput })}
             onBulkStatusUpdate={() => submitBulk("bulkStatus", { status: bulkStatus })}
-            isSubmitting={isBulkSubmitting}
+            isSubmitting={bulkFetcher.state === "submitting"}
           />
         )}
 
-        {/* Product Table with checkboxes */}
         <Layout>
           <Layout.Section>
             <Card padding="0">
               <IndexTable
-                resourceName={{ singular: "sản phẩm", plural: "sản phẩm" }}
+                resourceName={{ singular: t("nav.products"), plural: t("nav.products") }}
                 itemCount={products.length}
                 headings={[
                   { title: "" },
-                  { title: "Tên sản phẩm" },
-                  { title: "Trạng thái" },
-                  { title: "Nhà cung cấp" },
-                  { title: "Tồn kho" },
+                  { title: t("products.productName") },
+                  { title: t("products.status") },
+                  { title: t("products.vendor") },
+                  { title: t("products.inventory") },
                 ]}
                 selectable={false}
               >
-                {/* Select All */}
                 <IndexTable.Row id="select-all" position={-1}>
                   <IndexTable.Cell>
                     <Checkbox
@@ -273,7 +245,7 @@ export default function ProductsPage() {
                   </IndexTable.Cell>
                   <IndexTable.Cell>
                     <Text as="span" variant="bodySm" tone="subdued">
-                      {selectedIds.size === products.length ? "Bỏ chọn tất cả" : "Chọn tất cả"}
+                      {selectedIds.size === products.length ? t("common.deselectAll") : t("common.selectAll")}
                     </Text>
                   </IndexTable.Cell>
                   <IndexTable.Cell />

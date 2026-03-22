@@ -1,5 +1,6 @@
 import { IndexTable, InlineStack, Text, Badge, Button } from "@shopify/polaris";
 import type { MetafieldNode } from "../../utils/graphql";
+import { useTranslation } from "../../utils/i18n";
 
 interface MetafieldRowProps {
   metafield: MetafieldNode;
@@ -10,6 +11,8 @@ interface MetafieldRowProps {
 }
 
 export function MetafieldRow({ metafield, index, onEdit, onDelete, isDeleting }: MetafieldRowProps) {
+  const { t } = useTranslation();
+
   return (
     <IndexTable.Row id={metafield.id} key={metafield.id} position={index}>
       <IndexTable.Cell>
@@ -25,23 +28,16 @@ export function MetafieldRow({ metafield, index, onEdit, onDelete, isDeleting }:
       </IndexTable.Cell>
       <IndexTable.Cell>
         <Text as="span" variant="bodySm" truncate>
-          {metafield.value.length > 80
-            ? metafield.value.substring(0, 80) + "..."
-            : metafield.value}
+          {metafield.value.length > 80 ? metafield.value.substring(0, 80) + "..." : metafield.value}
         </Text>
       </IndexTable.Cell>
       <IndexTable.Cell>
         <InlineStack gap="200">
           <Button size="slim" onClick={() => onEdit(metafield)}>
-            Sửa
+            {t("common.edit")}
           </Button>
-          <Button
-            size="slim"
-            tone="critical"
-            loading={isDeleting}
-            onClick={() => onDelete(metafield.id)}
-          >
-            Xóa
+          <Button size="slim" tone="critical" loading={isDeleting} onClick={() => onDelete(metafield.id)}>
+            {t("common.delete")}
           </Button>
         </InlineStack>
       </IndexTable.Cell>

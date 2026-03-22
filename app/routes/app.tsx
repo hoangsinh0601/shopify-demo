@@ -3,8 +3,11 @@ import type { DetailedHTMLProps, HTMLAttributes } from "react";
 import { Outlet, useLoaderData, useRouteError } from "react-router";
 
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
-import polarisTranslations from "@shopify/polaris/locales/en.json";
 import { AppProvider as PolarisAppProvider } from "@shopify/polaris";
+
+// Static imports for Polaris translations
+import polarisEn from "@shopify/polaris/locales/en.json";
+import polarisVi from "@shopify/polaris/locales/vi.json";
 
 declare global {
   namespace JSX {
@@ -18,30 +21,53 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
 
 import { authenticate } from "../shopify.server";
+import { TranslationProvider, detectLocale, useTranslation } from "../utils/i18n";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
+  const locale = detectLocale(request);
 
-  // eslint-disable-next-line no-undef
-  return { apiKey: process.env.SHOPIFY_API_KEY || "" };
+  return {
+    apiKey: process.env.SHOPIFY_API_KEY || "",
+    locale,
+  };
 };
 
+// --- Polaris translations map ---
+
+const POLARIS_TRANSLATIONS: Record<string, typeof polarisEn> = {
+  en: polarisEn,
+  vi: polarisVi,
+};
+
+// --- Nav with i18n ---
+
+function AppNav() {
+  const { t } = useTranslation();
+  return (
+    <s-app-nav>
+      <s-link href="/app">{t("nav.dashboard")}</s-link>
+      <s-link href="/app/products">{t("nav.products")}</s-link>
+      <s-link href="/app/orders">{t("nav.orders")}</s-link>
+      <s-link href="/app/inventory">{t("nav.inventory")}</s-link>
+    </s-app-nav>
+  );
+}
+
 export default function App() {
-  const { apiKey } = useLoaderData<typeof loader>();
+  const { apiKey, locale } = useLoaderData<typeof loader>();
+  const polarisI18n = POLARIS_TRANSLATIONS[locale] ?? POLARIS_TRANSLATIONS.en;
 
   return (
-    <PolarisAppProvider i18n={polarisTranslations}>
-      <AppProvider embedded apiKey={apiKey}>
-        <s-app-nav>
-          <s-link href="/app">Dashboard</s-link>
-          <s-link href="/app/products">Sản phẩm</s-link>
-          <s-link href="/app/orders">Đơn hàng</s-link>
-          <s-link href="/app/inventory">Tồn kho</s-link>
-        </s-app-nav>
-        <Outlet />
-      </AppProvider>
+    <PolarisAppProvider i18n={polarisI18n}>
+      <TranslationProvider locale={locale}>
+        <AppProvider embedded apiKey={apiKey}>
+          <AppNav />
+          <Outlet />
+        </AppProvider>
+      </TranslationProvider>
     </PolarisAppProvider>
   );
 }
