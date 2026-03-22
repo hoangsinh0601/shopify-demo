@@ -48,7 +48,13 @@
     "vendor": "Vendor",
     "inventory": "Inventory",
     "bestSeller": "Best Seller",
-    "taggedAlready": "Already tagged"
+    "taggedAlready": "Already tagged",
+    "createProduct": "Create Product",
+    "createSuccess": "Product created successfully!",
+    "deleteProduct": "Delete Product",
+    "deleteSuccess": "Product deleted successfully!",
+    "deleteConfirm": "Are you sure you want to delete this product? This action cannot be undone.",
+    "productType": "Product Type"
   },
   "productDetail": {
     "productInfo": "Product Information",

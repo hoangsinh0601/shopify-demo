@@ -174,7 +174,15 @@ export default function ProductsPage() {
   };
 
   return (
-    <Page title={t("products.title")} backAction={{ url: "/app" }}>
+    <Page
+      title={t("products.title")}
+      backAction={{ onAction: () => navigate("/app") }}
+      primaryAction={
+        <Button variant="primary" onClick={() => navigate("/app/products/new")}>
+          {t("products.createProduct")}
+        </Button>
+      }
+    >
       <BlockStack gap="500">
         <Card>
           <SearchFilter

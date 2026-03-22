@@ -1,5 +1,5 @@
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
-import { useLoaderData, useFetcher } from "react-router";
+import { useLoaderData, useFetcher, useNavigate } from "react-router";
 import { useState, useEffect } from "react";
 import { Page, BlockStack, Layout, Card, IndexTable, Button } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
@@ -55,6 +55,7 @@ export default function ProductMetafieldsPage() {
   const fetcher = useFetcher<MetafieldActionResponse>();
   const shopify = useAppBridge();
   const { t } = useTranslation();
+  const navigate = useNavigate();
 
   const [showForm, setShowForm] = useState(false);
   const [namespace, setNamespace] = useState("custom");
@@ -90,7 +91,7 @@ export default function ProductMetafieldsPage() {
   return (
     <Page
       title={`${t("metafields.title")} — ${productTitle}`}
-      backAction={{ url: `/app/products/${numericId}` }}
+      backAction={{ onAction: () => navigate(`/app/products/${numericId}`) }}
       primaryAction={
         <Button variant="primary" onClick={() => setShowForm(true)}>
           {t("metafields.addMetafield")}

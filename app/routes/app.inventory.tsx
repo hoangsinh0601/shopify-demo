@@ -1,5 +1,5 @@
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
-import { useLoaderData } from "react-router";
+import { useLoaderData, useNavigate } from "react-router";
 import { Page, BlockStack, Banner } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import { fetchInventoryByLocation, adjustInventory } from "../services/inventory.server";
@@ -40,6 +40,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 export default function InventoryPage() {
   const { locations } = useLoaderData<typeof loader>();
   const { t } = useTranslation();
+  const navigate = useNavigate();
 
   const lowStockCount = locations.reduce(
     (count, loc) =>
@@ -62,7 +63,7 @@ export default function InventoryPage() {
   );
 
   return (
-    <Page title={t("inventory.title")} backAction={{ url: "/app" }}>
+    <Page title={t("inventory.title")} backAction={{ onAction: () => navigate("/app") }}>
       <BlockStack gap="500">
         {(lowStockCount > 0 || outOfStockCount > 0) && (
           <BlockStack gap="300">

@@ -110,3 +110,73 @@ export async function updateProduct(
   }
   return { success: true };
 }
+
+// --- Create Product ---
+
+interface ProductCreateInput {
+  title: string;
+  descriptionHtml?: string;
+  vendor?: string;
+  status?: string;
+  productType?: string;
+}
+
+export async function createProduct(
+  admin: AdminClient,
+  input: ProductCreateInput,
+): Promise<{ success: boolean; productId?: string; error?: string }> {
+  const response = await admin.graphql(
+    `
+    #graphql
+    mutation CreateProduct($input: ProductInput!) {
+      productCreate(input: $input) {
+        product { id }
+        userErrors { field message }
+      }
+    }
+  `,
+    { variables: { input } },
+  );
+
+  const result = await response.json();
+  const data = result as {
+    data: { productCreate: { product: { id: string } | null; userErrors: Array<{ field: string; message: string }> } };
+  };
+  const userErrors = data.data?.productCreate?.userErrors ?? [];
+
+  if (userErrors.length > 0) {
+    return { success: false, error: userErrors.map((e) => e.message).join(", ") };
+  }
+  return { success: true, productId: data.data.productCreate.product?.id };
+}
+
+// --- Delete Product ---
+
+export async function deleteProduct(
+  admin: AdminClient,
+  productId: string,
+): Promise<{ success: boolean; error?: string }> {
+  const response = await admin.graphql(
+    `
+    #graphql
+    mutation DeleteProduct($input: ProductDeleteInput!) {
+      productDelete(input: $input) {
+        deletedProductId
+        userErrors { field message }
+      }
+    }
+  `,
+    { variables: { input: { id: productId } } },
+  );
+
+  const result = await response.json();
+  const data = result as {
+    data: { productDelete: { userErrors: Array<{ field: string; message: string }> } };
+  };
+  const userErrors = data.data?.productDelete?.userErrors ?? [];
+
+  if (userErrors.length > 0) {
+    return { success: false, error: userErrors.map((e) => e.message).join(", ") };
+  }
+  return { success: true };
+}

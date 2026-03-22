@@ -56,7 +56,7 @@ export default function OrdersPage() {
   };
 
   return (
-    <Page title={t("orders.title")} backAction={{ url: "/app" }}>
+    <Page title={t("orders.title")} backAction={{ onAction: () => navigate("/app") }}>
       <BlockStack gap="500">
         <Card>
           <SearchFilter

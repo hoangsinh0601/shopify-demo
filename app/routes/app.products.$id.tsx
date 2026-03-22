@@ -1,14 +1,22 @@
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
-import { useLoaderData, useFetcher } from "react-router";
-import { useState, useEffect } from "react";
-import { Page, Layout, Card, BlockStack, InlineStack, Text, Badge, IndexTable } from "@shopify/polaris";
+import { useLoaderData, useFetcher, useNavigate } from "react-router";
+import { useState, useEffect, useCallback } from "react";
+import { Page, Layout, Card, BlockStack, InlineStack, Text, Badge, IndexTable, Modal, Banner } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import { useAppBridge } from "@shopify/app-bridge-react";
-import { fetchProductDetail, updateProduct } from "../services/product.server";
+import { fetchProductDetail, updateProduct, deleteProduct } from "../services/product.server";
 import type { ActionResponse } from "../utils/graphql";
 import { extractNumericId } from "../utils/graphql";
 import { ProductForm } from "../components/organisms/ProductForm";
 import { useTranslation } from "../utils/i18n";
+
+// --- Action Response with intent ---
+
+interface ProductActionResponse extends ActionResponse {
+  intent: "update" | "delete";
+}
+
+// --- Loader ---
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { admin } = await authenticate.admin(request);
@@ -17,12 +25,21 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   return { product };
 };
 
+// --- Action ---
+
 export const action = async ({ request, params }: ActionFunctionArgs) => {
   const { admin } = await authenticate.admin(request);
   const formData = await request.formData();
+  const intent = formData.get("intent") as string;
   const productId = `gid://shopify/Product/${params.id}`;
 
   try {
+    if (intent === "delete") {
+      const result = await deleteProduct(admin, productId);
+      return { intent: "delete" as const, ...result } satisfies ProductActionResponse;
+    }
+
+    // Default: update
     const result = await updateProduct(admin, {
       id: productId,
       title: formData.get("title") as string,
@@ -30,41 +47,64 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       vendor: formData.get("vendor") as string,
       status: formData.get("status") as string,
     });
-    return result satisfies ActionResponse;
+    return { intent: "update" as const, ...result } satisfies ProductActionResponse;
   } catch (error) {
     return {
+      intent: (intent === "delete" ? "delete" : "update") as "update" | "delete",
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
-    } satisfies ActionResponse;
+    } satisfies ProductActionResponse;
   }
 };
 
+// --- Product Detail Page ---
+
 export default function ProductDetailPage() {
   const { product } = useLoaderData<typeof loader>();
-  const fetcher = useFetcher<ActionResponse>();
+  const fetcher = useFetcher<ProductActionResponse>();
   const shopify = useAppBridge();
+  const navigate = useNavigate();
   const { t } = useTranslation();
 
   const [title, setTitle] = useState(product.title);
   const [descriptionHtml, setDescriptionHtml] = useState(product.descriptionHtml ?? "");
   const [vendor, setVendor] = useState(product.vendor ?? "");
   const [status, setStatus] = useState(product.status);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     if (fetcher.data?.success) {
-      shopify.toast.show(t("productDetail.updateSuccess"));
+      if (fetcher.data.intent === "delete") {
+        shopify.toast.show(t("products.deleteSuccess"));
+        navigate("/app/products");
+      } else {
+        shopify.toast.show(t("productDetail.updateSuccess"));
+      }
     } else if (fetcher.data && !fetcher.data.success) {
       shopify.toast.show(`${t("common.error")}: ${fetcher.data.error}`, { isError: true });
     }
   }, [fetcher.data]);
 
   const numericId = extractNumericId(product.id);
+  const isSubmitting = fetcher.state === "submitting";
+
+  const handleDelete = useCallback(() => {
+    setShowDeleteConfirm(false);
+    fetcher.submit({ intent: "delete" }, { method: "POST" });
+  }, [fetcher]);
 
   return (
     <Page
       title={product.title}
-      backAction={{ url: "/app/products" }}
-      secondaryActions={[{ content: t("productDetail.metafields"), url: `/app/products/${numericId}/metafields` }]}
+      backAction={{ onAction: () => navigate("/app/products") }}
+      secondaryActions={[
+        { content: t("productDetail.metafields"), onAction: () => navigate(`/app/products/${numericId}/metafields`) },
+        {
+          content: t("products.deleteProduct"),
+          destructive: true,
+          onAction: () => setShowDeleteConfirm(true),
+        },
+      ]}
     >
       <BlockStack gap="500">
         <Layout>
@@ -78,8 +118,13 @@ export default function ProductDetailPage() {
               onVendorChange={setVendor}
               status={status}
               onStatusChange={setStatus}
-              onSubmit={() => fetcher.submit({ title, descriptionHtml, vendor, status }, { method: "POST" })}
-              isSubmitting={fetcher.state === "submitting"}
+              onSubmit={() =>
+                fetcher.submit(
+                  { intent: "update", title, descriptionHtml, vendor, status },
+                  { method: "POST" },
+                )
+              }
+              isSubmitting={isSubmitting}
             />
           </Layout.Section>
 
@@ -101,6 +146,7 @@ export default function ProductDetailPage() {
           </Layout.Section>
         </Layout>
 
+        {/* Variants */}
         <Layout>
           <Layout.Section>
             <Card padding="0">
@@ -139,6 +185,28 @@ export default function ProductDetailPage() {
           </Layout.Section>
         </Layout>
       </BlockStack>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        open={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        title={t("products.deleteProduct")}
+        primaryAction={{
+          content: t("products.deleteProduct"),
+          destructive: true,
+          loading: isSubmitting,
+          onAction: handleDelete,
+        }}
+        secondaryActions={[
+          { content: t("common.cancel"), onAction: () => setShowDeleteConfirm(false) },
+        ]}
+      >
+        <Modal.Section>
+          <Banner tone="critical">
+            <p>{t("products.deleteConfirm")}</p>
+          </Banner>
+        </Modal.Section>
+      </Modal>
     </Page>
   );
 }

@@ -48,7 +48,13 @@
     "vendor": "Nhà cung cấp",
     "inventory": "Tồn kho",
     "bestSeller": "Bán chạy",
-    "taggedAlready": "Đã gắn tag"
+    "taggedAlready": "Đã gắn tag",
+    "createProduct": "Tạo sản phẩm",
+    "createSuccess": "Tạo sản phẩm thành công!",
+    "deleteProduct": "Xóa sản phẩm",
+    "deleteSuccess": "Đã xóa sản phẩm thành công!",
+    "deleteConfirm": "Bạn có chắc chắn muốn xóa sản phẩm này? Hành động này không thể hoàn tác.",
+    "productType": "Loại sản phẩm"
   },
   "productDetail": {
     "productInfo": "Thông tin sản phẩm",
